@@ -154,3 +154,94 @@ SELECT DISTINCT R1.name, R2.name
 FROM (Rating JOIN Reviewer USING(rID)) AS R1
   JOIN (Rating JOIN Reviewer USING(rID)) AS R2
 ON R1.mID = R2.mID AND R1.name < R2.name;
+
+/* For each rating that is the lowest (fewest stars) currently in the database,
+return the reviewer name, movie title, and number of stars. */
+SELECT name, title, Rating.stars
+FROM (SELECT min(DISTINCT stars) AS stars
+      FROM Rating) LowStars, Rating, Reviewer, Movie
+WHERE LowStars.stars = Rating.stars AND Rating.rID = Reviewer.rID AND
+  Rating.mID = Movie.mID;
+
+/* List movie titles and average ratings, from highest-rated to lowest-rated. If
+two or more movies have the same average rating, list them in alphabetical order. */
+SELECT title, avgStars
+FROM (SELECT mID, AVG(stars) AS avgStars
+      FROM Rating
+      GROUP BY mID) avgRatings JOIN Movie USING(mID)
+ORDER BY avgStars DESC, title;
+
+/* Find the names of all reviewers who have contributed three or more ratings.
+(As an extra challenge, try writing the query without HAVING or without COUNT.) */
+
+/* Method 1 (using HAVING and COUNT) */
+SELECT name
+FROM (SELECT rID
+      FROM Rating
+      GROUP BY rID
+      HAVING COUNT(*) >= 3) KeenReviewers JOIN Reviewer USING(rID);
+
+/* Method 2 (without using HAVING) */
+/*******************************************************************************
+ * Additional explanation on the query:
+ * From the R1 relation, we're checking the ratings from the same rID
+ * (reviewer) in the second Rating instance R2 and then we are going to
+ * count them up and return the rIDs where there are more than 3 reviews. Rename
+ * this relation with the alias KeenReviewers, natural joined with Reviewer and
+ * finally project the names of those reviewers with three or more ratings.
+*******************************************************************************/
+SELECT DISTINCT name
+FROM (SELECT rID
+      FROM Rating R1
+      WHERE (SELECT COUNT(*)
+            FROM Rating R2
+            WHERE R2.rID = R1.rID) >= 3) KeenReviewers JOIN Reviewer USING(rID);
+
+/* Some directors directed more than one movie. For all such directors, return
+the titles of all movies directed by them, along with the director name. Sort by
+director name, then movie title. (As an extra challenge, try writing the query
+both with and without COUNT.) */
+
+/* Method 1 (using COUNT) */
+SELECT title, director
+FROM (SELECT director
+      FROM Movie
+      GROUP BY director
+      HAVING COUNT(*) > 1) AS D JOIN Movie USING(director)
+ORDER BY director, title;
+
+/* Method 2 (without COUNT) */
+SELECT title, director
+FROM (SELECT M1.director AS director
+      FROM Movie M1, Movie M2
+      WHERE M1.director = M2.director AND M1.title < M2.title) MultiDirector
+  JOIN Movie USING(director)
+ORDER BY director, title;
+
+/* Find the movie(s) with the highest average rating. Return the movie title(s)
+and average rating. (Hint: This query is more difficult to write in SQLite than
+other systems; you might think of it as finding the highest average rating and
+then choosing the movie(s) with that average rating.) */
+SELECT title, MaxRating.avgStars
+FROM (SELECT MAX(avgStars) AS avgStars
+      FROM (SELECT mID, AVG(stars) AS avgStars
+            FROM Rating
+            GROUP BY mID) AvgRating1) AS MaxRating,
+  (SELECT mID, AVG(stars) AS avgStars
+  FROM Rating
+  GROUP BY mID) AS AvgRating2, Movie
+WHERE MaxRating.avgStars = AvgRating2.avgStars AND Movie.mID = AvgRating2.mID;
+
+/* Find the movie(s) with the lowest average rating. Return the movie title(s)
+and average rating. (Hint: This query may be more difficult to write in SQLite
+than other systems; you might think of it as finding the lowest average rating
+and then choosing the movie(s) with that average rating.) */
+SELECT title, MinRating.avgStars
+FROM (SELECT MIN(avgStars) AS avgStars
+      FROM (SELECT mID, AVG(stars) AS avgStars
+            FROM Rating
+            GROUP BY mID) AvgRating1) AS MinRating, /* Finds min rating from list of average ratings */
+  (SELECT mID, AVG(stars) AS avgStars
+  FROM Rating
+  GROUP BY mID) AS AvgRating2, Movie /* join back to average ratings to find those movies */
+WHERE MinRating.avgStars = AvgRating2.avgStars AND Movie.mID = AvgRating2.mID;
