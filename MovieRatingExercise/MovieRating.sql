@@ -243,5 +243,24 @@ FROM (SELECT MIN(avgStars) AS avgStars
             GROUP BY mID) AvgRating1) AS MinRating, /* Finds min rating from list of average ratings */
   (SELECT mID, AVG(stars) AS avgStars
   FROM Rating
-  GROUP BY mID) AS AvgRating2, Movie /* join back to average ratings to find those movies */
+  /* join back to the computed average ratings relation to find those movies */
+  GROUP BY mID) AS AvgRating2, Movie
 WHERE MinRating.avgStars = AvgRating2.avgStars AND Movie.mID = AvgRating2.mID;
+
+
+/* For each director, return the director's name together with the title(s) of
+the movie(s) they directed that received the highest rating among all of their
+movies, and the value of that rating. Ignore movies whose director is NULL. */
+
+/*******************************************************************************
+ * Additional explanation on the query:
+ * The relation with alias movieMaxRatings finds the max rating for each movie;
+ * the main, outer query then finds the max of the max for each director and
+ * filters out the movies where the director is NULL (unknown)
+*******************************************************************************/
+SELECT director, title, max(stars)
+FROM (SELECT title, director, max(stars) AS stars
+      FROM Rating JOIN Movie USING(mID)
+      GROUP BY mID) AS movieMaxRatings
+WHERE director IS NOT NULL
+GROUP BY director;
