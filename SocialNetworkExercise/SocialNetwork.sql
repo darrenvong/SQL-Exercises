@@ -107,3 +107,59 @@ FROM
   ) AS trioIDs,
   Highschooler H1, Highschooler H2, Highschooler H3
 WHERE H1.ID = AdmirerID AND H2.ID = AdmireeID AND H3.ID = mutFriendID;
+
+/* Find the difference between the number of students in the school and the
+number of different first names. */
+SELECT COUNT(*) - COUNT(DISTINCT name)
+FROM Highschooler;
+
+/* Find the name and grade of all students who are liked by more than one other
+student */
+SELECT name, grade
+FROM
+  (SELECT ID2 AS ID
+  FROM Likes
+  GROUP BY ID2
+  HAVING COUNT(*) > 1
+  ) AS popularStudents
+  JOIN
+  Highschooler USING(ID);
+
+/*******************************************************************
+ * Data modifications
+*******************************************************************/
+
+/* It's time for the seniors to graduate. Remove all 12th graders from Highschooler. */
+DELETE FROM Highschooler WHERE grade = 12;
+
+/* If two students A and B are friends, and A likes B but not vice-versa,
+remove the Likes tuple. */
+DELETE FROM Likes
+WHERE ID1 IN
+  (SELECT ID1
+  FROM
+    /* Likes who are also friends with each other */
+    (SELECT * FROM Friend
+    INTERSECT
+    SELECT * FROM Likes
+    EXCEPT
+    /* Mutual likes and friends with each other (2nd cond a given) */ 
+    SELECT L1.ID1, L1.ID2
+    FROM Likes L1, Likes L2
+    WHERE L1.ID1 = L2.ID2 AND L1.ID2 = L2.ID1
+    )
+    /* Overall result = One way likes who are just friends, as required to be removed */
+  );
+
+/* For all cases where A is friends with B, and B is friends with C, add a new
+friendship for the pair A and C. Do not add duplicate friendships, friendships
+that already exist, or friendships with oneself. (This one is a bit challenging;
+congratulations if you get it right.) */
+INSERT INTO Friend
+/* Finds all "transitive" friends (A->B and B->C), excluding self friendships */
+SELECT F1.ID1 AS ID1, F2.ID2 AS ID2
+FROM Friend F1, Friend F2
+WHERE F1.ID2 = F2.ID1 AND F1.ID1 <> F2.ID2
+/* Minus those who are already friends to prevent duplicate friendships */
+EXCEPT
+SELECT * FROM Friend;
